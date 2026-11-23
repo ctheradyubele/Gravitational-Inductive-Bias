@@ -1,0 +1,67 @@
+# Paper 2 protocol. Fixed before the confirmatory runs. Any change after the pilot is a deviation and
+# must be recorded in DEVIATIONS.md with the date and the reason.
+
+data:
+  corpus: wikitext-103-raw-v1      # Salesforce/wikitext
+  tokenizer: bert-base-uncased
+  seq_len: 128
+  mlm_probability: 0.15            # 80% [MASK], 10% random, 10% unchanged
+  eval_mask_seed: 1234
+  max_eval_sequences: 2000         # validation and test
+
+model:                             # confirmed by the pilot (15 Nov 2026)
+  layers: 6
+  dim: 512
+  heads: 8
+  ffn: 2048
+  dropout: 0.1
+  norm: pre_layernorm
+
+train:                             # confirmed by the pilot (15 Nov 2026)
+  steps: 20000
+  batch_size: 256
+  micro_batch: 128                 # pilot: 7.1 GB peak at 64, so 128 fits an A100 40 GB comfortably
+  lr: 5.0e-4
+  grav_lr: 1.0e-3
+  weight_decay: 0.01
+  warmup: 1000
+  clip: 1.0
+  amp: true                        # gravitational arithmetic always runs in float32
+  seeds:                           # decided 20 Nov 2026, before any B or D run (compute limits)
+    A: [0, 1, 2, 3, 4]
+    B: [0, 1, 2]
+    D: [0, 1, 2]
+
+experiments:                       # names from gib/variants.py
+  A: [A1_standard, A2_hybrid, A3_pure, A4_distance_only]
+  A_optional: [A5_l2_paper1]
+  B: [B_learned_inverse_square_floor, B_learned_inverse_square_fixed,
+      B_learned_l2_learned, B_learned_l2_floor, B_learned_l2_fixed,
+      B_norm_inverse_square_learned, B_norm_inverse_square_floor, B_norm_inverse_square_fixed,
+      B_norm_l2_learned, B_norm_l2_floor, B_norm_l2_fixed, B_mass_only]
+  D: [D1a_floor_0.02, D1b_floor_0.05, D3_bounded, D4_bounded_learned_sigma]
+
+pilot:                             # decisions the pilot must settle (see the specification, Open decisions)
+  steps: 2000
+  seed: 99                         # never reused in confirmatory runs
+  runs:
+    - {name: speed_and_loss, variants: [A1_standard, A2_hybrid, A3_pure, D3_bounded]}
+    - {name: g_strategy, variant: A2_hybrid,
+       options: [frozen_at_step0, recalibrate_at_warmup_end, learned_g]}
+    - {name: lambda_floor, variants: [D1a_floor_0.02, D1b_floor_0.05]}
+  record: [seconds_per_step, peak_memory, val_loss_curve, contribution_C, kl_D, max_score, nonfinite_steps]
+
+g_strategy: frozen_at_step0        # pilot: recalibrated and learned G ended within 0.01 of frozen (C 0.252-0.261)
+
+pilot_results:                     # seed 99, 2,000 steps, A100 40 GB, micro_batch 64
+  seconds_per_step: {A1_standard: 0.159, A2_hybrid: 0.210, A3_pure: 0.199, D3_bounded: 0.213}
+  peak_memory_mb: {A1_standard: 5850, gravitational: 6900-7123}
+  val_loss_2000: {A1: 4.032, A2: 4.023, A2_recal: 4.019, A2_learned_g: 4.022, A3: 4.080, D1a: 4.025, D1b: 4.026, D3: 4.021}
+  contribution_C_A2: {step0: 0.036, step1000: 0.095, step2000: 0.252}
+  mass_shuffle_val_loss_A2: 4.175   # vs 4.023 unshuffled
+  nonfinite_steps: 0
+  fix_after_pilot: floor variant reparameterised (projection instead of softplus); see gib/attention.py
+
+suppression_thresholds:            # absolute values kept: C starts at 0.036 but grows past 0.25 by step 2000
+  C: 0.05
+  D_nats: 0.01
