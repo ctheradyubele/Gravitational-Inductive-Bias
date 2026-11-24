@@ -40,6 +40,8 @@ EXPERIMENTS = {
     "A_optional": ["A5_l2_paper1"],
     "B": [n for n in VARIANTS if n.startswith("B_") and n not in ALIASES],
     "D": ["D1a_floor_0.02", "D1b_floor_0.05", "D3_bounded", "D4_bounded_learned_sigma"],
+    # Experiment C (added 23 Nov 2026, design fixed before any C run): A1, A2, A4 at 512-token sequences.
+    "C": ["A1_standard", "A2_hybrid", "A4_distance_only"],
 }
 
 

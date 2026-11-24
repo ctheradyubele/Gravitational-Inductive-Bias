@@ -4,6 +4,8 @@
     python scripts/run_matrix.py A --root /content/drive/MyDrive/GAM_Paper2/runs
     python scripts/run_matrix.py B --root ...      # seeds 0-2 (A: 0-4); override with --seeds
     python scripts/run_matrix.py all --root ...
+    python scripts/run_matrix.py pilot_C --root /content/drive/MyDrive/GAM_Paper2/pilot_C
+    python scripts/run_matrix.py C --root /content/drive/MyDrive/GAM_Paper2/runs   # writes to <root>/C_seq512/
 
 Each run writes to <root>/<variant>/s<seed>/ (pilot: <root>/<run name>/). A run whose results.json
 exists is skipped, so the script can simply be restarted after a Colab disconnect; an interrupted
@@ -24,7 +26,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TRAIN = os.path.join(HERE, "train_mlm.py")
 PILOT_SEED, PILOT_STEPS, WARMUP = 99, 2000, 1000
 # Decided 20 Nov 2026, before any B or D run (compute limits): A keeps five seeds, B and D use three.
-SEEDS = {"A": [0, 1, 2, 3, 4], "A_optional": [0, 1, 2, 3, 4], "B": [0, 1, 2], "D": [0, 1, 2]}
+SEEDS = {"A": [0, 1, 2, 3, 4], "A_optional": [0, 1, 2, 3, 4], "B": [0, 1, 2], "D": [0, 1, 2], "C": [0, 1, 2]}
+# Experiment C (decided 23 Nov 2026, before any C run): sequences of 512 tokens, 64 sequences per step, so the
+# tokens per step (32,768), steps (20,000) and passes over the data match Experiments A, B and D.
+C_ARGS = ["--seq_len", "512", "--batch_size", "64", "--micro_batch", "32"]
+C_DIR = "C_seq512"   # C reuses variant names, so its runs live in their own folder
+
+
+def pilot_c_runs(extra, micro_batch):
+    base = ["--seed", str(PILOT_SEED), "--steps", "300", "--eval_every", "300", "--diag_every", "100",
+            "--max_eval", "256", "--seq_len", "512", "--batch_size", "64", "--micro_batch", str(micro_batch)]
+    return [(f"{v}_mb{micro_batch}", ["--variant", v] + base + extra) for v in ("A1_standard", "A2_hybrid")]
 
 
 def pilot_runs(extra):
@@ -43,17 +55,24 @@ def pilot_runs(extra):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("which", choices=["pilot", "A", "A_optional", "B", "D", "all"])
+    ap.add_argument("which", choices=["pilot", "pilot_C", "A", "A_optional", "B", "D", "C", "all"])
     ap.add_argument("--root", required=True)
     ap.add_argument("--seeds", default=None,
                     help="comma-separated seeds; default per experiment (A: 0-4; B and D: 0-2, decided 20 Nov 2026)")
     ap.add_argument("--dry", action="store_true", help="print the commands only")
     ap.add_argument("--extra", default="--amp", help="extra arguments passed to every run")
+    ap.add_argument("--micro_batch", type=int, default=32, help="pilot_C only: micro-batch to test")
     a = ap.parse_args()
     extra = a.extra.split()
 
     if a.which == "pilot":
         jobs = [(os.path.join(a.root, n), args) for n, args in pilot_runs(extra)]
+    elif a.which == "pilot_C":
+        jobs = [(os.path.join(a.root, n), args) for n, args in pilot_c_runs(extra, a.micro_batch)]
+    elif a.which == "C":
+        seeds = [int(s) for s in a.seeds.split(",")] if a.seeds else SEEDS["C"]
+        jobs = [(os.path.join(a.root, C_DIR, v, f"s{s}"), ["--variant", v, "--seed", str(s)] + C_ARGS + extra)
+                for s in seeds for v in variants.EXPERIMENTS["C"]]
     else:
         exps = ["A", "B", "D"] if a.which == "all" else [a.which]
         jobs = []

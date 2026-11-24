@@ -65,3 +65,12 @@ pilot_results:                     # seed 99, 2,000 steps, A100 40 GB, micro_bat
 suppression_thresholds:            # absolute values kept: C starts at 0.036 but grows past 0.25 by step 2000
   C: 0.05
   D_nats: 0.01
+
+experiment_C:                      # added 23 Nov 2026, fixed before any C run (see DEVIATIONS.md)
+  variants: [A1_standard, A2_hybrid, A4_distance_only]
+  seeds: [0, 1, 2]
+  seq_len: 512
+  batch_size: 64                   # 64 x 512 = 32,768 tokens per step, as in A, B and D (256 x 128)
+  micro_batch: 32                  # may be lowered after the pilot if memory requires; results unaffected
+  steps: 20000
+  primary_comparison: "A2_hybrid - A1_standard at 512 tokens, against the same difference at 128 tokens (seeds 0-2)"
