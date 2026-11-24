@@ -1,0 +1,8 @@
+Check,Statistic,p
+Shapiro–Wilk test of residual normality,W = 0.928,0.021
+Levene test (median) of equal variance across the 12 cells,F = 0.47,0.904
+Breusch–Pagan test of constant residual variance,LM = 8.16,0.699
+Largest absolute studentised residual,3.40,—
+"Rank-transformed ANOVA, mass effect",F = 49.19,0.0000
+"Rank-transformed ANOVA, kernel effect",F = 15.50,0.0006
+"Rank-transformed ANOVA, mixing effect",F = 1.83,0.1828
